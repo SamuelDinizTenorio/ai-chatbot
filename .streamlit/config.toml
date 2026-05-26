@@ -1,15 +1,8 @@
 [theme]
-# Cor de destaque (botões, foco de inputs, barras de progresso)
-primaryColor = "#7A1CAC"
 
-# Cor de fundo da área principal do chat
-backgroundColor = "#1E1E2E"
-
-# Cor de fundo dos menus laterais ou caixas de diálogo
-secondaryBackgroundColor = "#252538"
-
-# Cor do texto principal
-textColor = "#F5F5F5"
-
-# Fonte do texto (sans serif, serif ou monospace)
-font = "sans serif"
+base = "dark"  # Força o comportamento base do modo escuro
+primaryColor = "#7A1CAC" # Cor de destaque (botões, foco de inputs, barras de progresso)
+backgroundColor = "#1E1E2E" # Cor de fundo da área principal do chat
+secondaryBackgroundColor = "#252538" # Cor de fundo dos menus laterais ou caixas de diálogo
+textColor = "#F5F5F5" # Cor do texto principal
+font = "sans serif" # Fonte do texto (sans serif, serif ou monospace)
