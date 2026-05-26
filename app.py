@@ -29,42 +29,24 @@ class SessionFilter(logging.Filter):
 
 @st.cache_resource
 def setup_logging() -> logging.Logger:
-    """Configura o sistema de logs da aplicação com rotação automática de arquivos.
-    
-    Cria a pasta 'logs' caso não exista, define o limite de tamanho do arquivo
-    para evitar estouro de disco e configura um formato padronizado contendo
-    o ID da sessão do usuário.
-
-    Returns:
-        logging.Logger: Instância configurada do logger para uso na aplicação.
-    """
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-
-    # Instancia o handler rotativo: 5MB por arquivo, mantendo até 3 backups
-    log_handler = RotatingFileHandler(
-        "logs/app.log", 
-        maxBytes=1024 * 1024 * 5, 
-        backupCount=3,
-        encoding='utf-8'
-    )
-    
-    # Formato do log incluindo o campo %(session_id)s injetado pelo filtro
-    log_format = '%(asctime)s - [%(session_id)s] - %(levelname)s - %(message)s'
-    formatter = logging.Formatter(log_format)
-    log_handler.setFormatter(formatter)
-    
+    """Configuração limpa e de alta performance para CloudWatch/Fargate."""
     logger = logging.getLogger("ChatBot")
     logger.setLevel(logging.INFO)
     
-    # Evita duplicação de handlers durante as re-execuções nativas do Streamlit
     if logger.hasHandlers():
         logger.handlers.clear()
+        
+    # Formato padronizado que as ferramentas de busca da AWS (como CloudWatch Insights)
+    # conseguem ler e filtrar facilmente.
+    log_format = '%(asctime)s - [%(session_id)s] - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(log_format)
     
-    # Aplica o filtro de sessão e os handlers criados
+    # Envia tudo para o console (stdout). A AWS captura isso automaticamente.
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    
     logger.addFilter(SessionFilter())
-    logger.addHandler(log_handler)
-    logger.addHandler(logging.StreamHandler())
+    logger.addHandler(console_handler)
     
     return logger
 
