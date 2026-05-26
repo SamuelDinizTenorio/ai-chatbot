@@ -22,8 +22,11 @@ class SessionFilter(logging.Filter):
     mesmo que múltiplos usuários estejam acessando o chatbot simultaneamente.
     """
     def filter(self, record: logging.LogRecord) -> bool:
+        # Importação e método oficial para capturar o contexto atual da sessão
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        
         # Recupera o ID de sessão único gerado pelo Streamlit para o usuário atual
-        ctx = st.runtime.scriptrunner.script_run_context.get_script_run_context()
+        ctx = get_script_run_ctx()
         record.session_id = ctx.session_id if ctx else "N/A"
         return True
 
@@ -99,64 +102,68 @@ def prepare_gemini_history(messages: List[Dict[str, str]]) -> List[genai.types.C
 # INTERFACE E FLUXO DA CONVERSA (STREAMLIT)
 # ==============================================================================
 
-st.write("# ChatBot with AI")
+def main():
+    st.write("# ChatBot with AI")
 
-# Inicialização segura do estado da sessão do chat
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+    # Inicialização segura do estado da sessão do chat
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = []
 
-# Captura a entrada do usuário na barra de chat
-user_input: str = st.chat_input()
+    # Captura a entrada do usuário na barra de chat
+    user_input: str = st.chat_input()
 
-# Renderização do histórico em tela
-for message in st.session_state.messages:
-    role_display = "assistant" if message["role"] == "model" else "user"
-    st.chat_message(role_display).write(message["content"])
+    # Renderização do histórico em tela
+    for message in st.session_state.messages:
+        role_display = "assistant" if message["role"] == "model" else "user"
+        st.chat_message(role_display).write(message["content"])
 
-# Processamento da nova mensagem enviada
-if user_input:
-    # Atualiza a interface e o estado local com a mensagem do usuário
-    st.chat_message("user").write(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    # Processamento da nova mensagem enviada
+    if user_input:
+        # Atualiza a interface e o estado local com a mensagem do usuário
+        st.chat_message("user").write(user_input)
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        logger.info(f"Mensagem recebida. Tamanho do histórico local: {len(st.session_state.messages)} mensagens.")
+        
+        # Conversão do histórico de mensagens
+        gemini_history = prepare_gemini_history(st.session_state.messages)
+        
+        try:
+            logger.info(f"Iniciando requisição à API (Modelo: {MODEL_NAME})")
+            
+            # Início do cronômetro para medir a latência da resposta
+            start_time = time.time()
+            
+            chat = client.chats.create(
+                model=MODEL_NAME, 
+                history=gemini_history
+            )
+            
+            response = chat.send_message(user_input)
+            ai_response = response.text
+            
+            # Fim do cronômetro
+            latency = time.time() - start_time
+            
+            # Extração opcional de metadados de tokens (se suportado pelo objeto de resposta)
+            token_info = ""
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                prompt_tokens = response.usage_metadata.prompt_token_count
+                candidates_tokens = response.usage_metadata.candidates_token_count
+                token_info = f" | Prompt Tokens: {prompt_tokens} | Output Tokens: {candidates_tokens}"
+            
+            # Log enriquecido com métricas de performance e custo
+            logger.info(f"Resposta gerada com sucesso | Tempo de Resposta: {latency:.2f}s{token_info}")
+            
+            # Atualiza a interface e o estado local com a resposta do modelo
+            st.chat_message("assistant").write(ai_response)
+            st.session_state.messages.append({"role": "model", "content": ai_response})
+            
+        except Exception as e:
+            # Captura detalhada de falhas, incluindo o rastreio da pilha de execução (Stacktrace)
+            logger.error(f"Falha na comunicação com o provedor de IA: {str(e)}", exc_info=True)
+            st.error("Desculpe, tive um problema ao processar sua requisição. Por favor, tente novamente.")
+        
+if __name__ == "__main__":
+    main()
     
-    logger.info(f"Mensagem recebida. Tamanho do histórico local: {len(st.session_state.messages)} mensagens.")
-    
-    # Conversão do histórico de mensagens
-    gemini_history = prepare_gemini_history(st.session_state.messages)
-    
-    try:
-        logger.info(f"Iniciando requisição à API (Modelo: {MODEL_NAME})")
-        
-        # Início do cronômetro para medir a latência da resposta
-        start_time = time.time()
-        
-        chat = client.chats.create(
-            model=MODEL_NAME, 
-            history=gemini_history
-        )
-        
-        response = chat.send_message(user_input)
-        ai_response = response.text
-        
-        # Fim do cronômetro
-        latency = time.time() - start_time
-        
-        # Extração opcional de metadados de tokens (se suportado pelo objeto de resposta)
-        token_info = ""
-        if hasattr(response, 'usage_metadata') and response.usage_metadata:
-            prompt_tokens = response.usage_metadata.prompt_token_count
-            candidates_tokens = response.usage_metadata.candidates_token_count
-            token_info = f" | Prompt Tokens: {prompt_tokens} | Output Tokens: {candidates_tokens}"
-        
-        # Log enriquecido com métricas de performance e custo
-        logger.info(f"Resposta gerada com sucesso | Tempo de Resposta: {latency:.2f}s{token_info}")
-        
-        # Atualiza a interface e o estado local com a resposta do modelo
-        st.chat_message("assistant").write(ai_response)
-        st.session_state.messages.append({"role": "model", "content": ai_response})
-        
-    except Exception as e:
-        # Captura detalhada de falhas, incluindo o rastreio da pilha de execução (Stacktrace)
-        logger.error(f"Falha na comunicação com o provedor de IA: {str(e)}", exc_info=True)
-        st.error("Desculpe, tive um problema ao processar sua requisição. Por favor, tente novamente.")
-        
