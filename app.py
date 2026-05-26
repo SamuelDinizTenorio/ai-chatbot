@@ -1,20 +1,47 @@
 import streamlit as st
 from google import genai
 import os
+import time
+from datetime import datetime
 from dotenv import load_dotenv
 import logging
 from logging.handlers import RotatingFileHandler
- 
-# Carrega as variáveis de ambiente necessárias para a execução
-load_dotenv() 
+from typing import List, Dict, Any
 
-# st.cache_resource garante que o Streamlit execute isso APENAS UMA VEZ
+# Carrega as variáveis de ambiente necessárias para a execução
+load_dotenv()
+
+# ==============================================================================
+# SISTEMA DE LOGS E RASTREAMENTO
+# ==============================================================================
+
+class SessionFilter(logging.Filter):
+    """Filtro personalizado para injetar o ID da sessão do Streamlit nos logs.
+    
+    Isso permite rastrear as interações de um usuário específico de forma isolada,
+    mesmo que múltiplos usuários estejam acessando o chatbot simultaneamente.
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Recupera o ID de sessão único gerado pelo Streamlit para o usuário atual
+        ctx = st.runtime.scriptrunner.script_run_context.get_script_run_context()
+        record.session_id = ctx.session_id if ctx else "N/A"
+        return True
+
 @st.cache_resource
-def setup_logging():
-    """Configures the logging system with file rotation."""
+def setup_logging() -> logging.Logger:
+    """Configura o sistema de logs da aplicação com rotação automática de arquivos.
+    
+    Cria a pasta 'logs' caso não exista, define o limite de tamanho do arquivo
+    para evitar estouro de disco e configura um formato padronizado contendo
+    o ID da sessão do usuário.
+
+    Returns:
+        logging.Logger: Instância configurada do logger para uso na aplicação.
+    """
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
+    # Instancia o handler rotativo: 5MB por arquivo, mantendo até 3 backups
     log_handler = RotatingFileHandler(
         "logs/app.log", 
         maxBytes=1024 * 1024 * 5, 
@@ -22,86 +49,132 @@ def setup_logging():
         encoding='utf-8'
     )
     
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    # Formato do log incluindo o campo %(session_id)s injetado pelo filtro
+    log_format = '%(asctime)s - [%(session_id)s] - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(log_format)
     log_handler.setFormatter(formatter)
     
     logger = logging.getLogger("ChatBot")
     logger.setLevel(logging.INFO)
     
-    # Limpa handlers antigos caso o Streamlit tente recriar por algum motivo
+    # Evita duplicação de handlers durante as re-execuções nativas do Streamlit
     if logger.hasHandlers():
         logger.handlers.clear()
     
+    # Aplica o filtro de sessão e os handlers criados
+    logger.addFilter(SessionFilter())
     logger.addHandler(log_handler)
     logger.addHandler(logging.StreamHandler())
+    
     return logger
 
-# Inicializa o logger com segurança contra duplicações
+# Inicializa o logger global
 logger = setup_logging()
 
-# Inicializa o cliente do Gemini
-# O SDK busca automaticamente a variável GEMINI_API_KEY no seu arquivo .env
-client = genai.Client()
+# ==============================================================================
+# INICIALIZAÇÃO DE COMPONENTES CORE
+# ==============================================================================
 
-# Title
-st.write("# ChatBot with AI")
+try:
+    # O SDK conecta automaticamente usando a variável GEMINI_API_KEY do .env
+    client = genai.Client()
+except Exception as e:
+    logger.critical(f"Falha crítica na inicialização do cliente Gemini: {str(e)}")
+    st.error("Erro interno de configuração. Por favor, contate o administrador.")
+    st.stop()
 
-if not "messages" in st.session_state:
-    st.session_state["messages"] = []
+# Nome do modelo padrão caso não esteja definido no arquivo .env
+MODEL_NAME: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
-# Text input
-input = st.chat_input()
+# ==============================================================================
+# DOCUMENTAÇÃO E TRATAMENTO DE DADOS
+# ==============================================================================
 
-# Renderiza o histórico na tela
-for message in st.session_state.messages:
-    # Mapeia "model" para "assistant" ou mantém "ai" para o Streamlit renderizar o ícone correto
-    role_display = "assistant" if message["role"] == "model" else "user"
-    st.chat_message(role_display).write(message["content"])
-
-if input:
-    # 1. Mostra e salva a mensagem do usuário
-    st.chat_message("user").write(input)
-    st.session_state.messages.append({"role": "user", "content": input})
+def prepare_gemini_history(messages: List[Dict[str, str]]) -> List[genai.types.Content]:
+    """Converte o histórico de mensagens do Streamlit no formato oficial do Gemini SDK.
     
-    # Loga a entrada do usuário
-    logger.info(f"Usuário enviou uma mensagem. Tamanho do histórico atual: {len(st.session_state.messages)}")
-    
-    # 2. Prepara o histórico no formato que o Gemini espera
-    # O Gemini precisa que as mensagens alternem entre "user" e "model"
-    gemini_history = []
-    for msg in st.session_state.messages:
+    A API do Gemini exige uma estrutura estrita baseada em objetos de Content e Parts,
+    além de requerer a alternância correta entre os papéis 'user' e 'model'.
+
+    Args:
+        messages (List[Dict[str, str]]): Lista de dicionários contendo o histórico 
+            no formato [{"role": "...", "content": "..."}].
+
+    Returns:
+        List[genai.types.Content]: Lista de objetos formatados prontos para a API.
+    """
+    gemini_history: List[genai.types.Content] = []
+    for msg in messages:
         gemini_history.append(
             genai.types.Content(
                 role=msg["role"],
                 parts=[genai.types.Part.from_text(text=msg["content"])]
             )
         )
-        
-    # 3. Define o modelo (ex: gemini-2.5-flash) vindo do .env ou direto no código
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    return gemini_history
+
+# ==============================================================================
+# INTERFACE E FLUXO DA CONVERSA (STREAMLIT)
+# ==============================================================================
+
+st.write("# ChatBot with AI")
+
+# Inicialização segura do estado da sessão do chat
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+
+# Captura a entrada do usuário na barra de chat
+user_input: str = st.chat_input()
+
+# Renderização do histórico em tela
+for message in st.session_state.messages:
+    role_display = "assistant" if message["role"] == "model" else "user"
+    st.chat_message(role_display).write(message["content"])
+
+# Processamento da nova mensagem enviada
+if user_input:
+    # Atualiza a interface e o estado local com a mensagem do usuário
+    st.chat_message("user").write(user_input)
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    
+    logger.info(f"Mensagem recebida. Tamanho do histórico local: {len(st.session_state.messages)} mensagens.")
+    
+    # Conversão do histórico de mensagens
+    gemini_history = prepare_gemini_history(st.session_state.messages)
     
     try:
-        logger.info(f"Chamando a API do Gemini usando o modelo: {model_name}")
+        logger.info(f"Iniciando requisição à API (Modelo: {MODEL_NAME})")
         
-        # 4. Cria a sessão de chat enviando o histórico atualizado
+        # Início do cronômetro para medir a latência da resposta
+        start_time = time.time()
+        
         chat = client.chats.create(
-            model=model_name, 
+            model=MODEL_NAME, 
             history=gemini_history
         )
         
-        # 5. Envia a nova mensagem do usuário dentro do contexto do chat
-        response = chat.send_message(input)
+        response = chat.send_message(user_input)
         ai_response = response.text
         
-        # Log de sucesso (Se quiser monitorar custos, pode logar o uso de tokens aqui se disponível na response)
-        logger.info("Resposta recebida com sucesso da API do Gemini.")
+        # Fim do cronômetro
+        latency = time.time() - start_time
         
-        # 6. Mostra e salva a resposta da IA
+        # Extração opcional de metadados de tokens (se suportado pelo objeto de resposta)
+        token_info = ""
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            prompt_tokens = response.usage_metadata.prompt_token_count
+            candidates_tokens = response.usage_metadata.candidates_token_count
+            token_info = f" | Prompt Tokens: {prompt_tokens} | Output Tokens: {candidates_tokens}"
+        
+        # Log enriquecido com métricas de performance e custo
+        logger.info(f"Resposta gerada com sucesso | Tempo de Resposta: {latency:.2f}s{token_info}")
+        
+        # Atualiza a interface e o estado local com a resposta do modelo
         st.chat_message("assistant").write(ai_response)
         st.session_state.messages.append({"role": "model", "content": ai_response})
         
     except Exception as e:
-        # Se der erro (ex: falta de internet, chave inválida, erro na API), o log captura
-        logger.error(f"Erro ao chamar a API do Gemini: {str(e)}", exc_info=True)
-        st.error("Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente mais tarde.")
-    
+        # Captura detalhada de falhas, incluindo o rastreio da pilha de execução (Stacktrace)
+        logger.error(f"Falha na comunicação com o provedor de IA: {str(e)}", exc_info=True)
+        st.error("Desculpe, tive um problema ao processar sua requisição. Por favor, tente novamente.")
+        
