@@ -1,0 +1,42 @@
+name: CI - Testes Automatizados
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+# ==============================================================================
+# ESTÁGIO DE TESTES (CI) - Garante a saúde do código
+# ==============================================================================
+  test:
+    name: Rodar Testes e Validações
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Instalar Dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest ruff
+        pip install -r requirements.txt
+
+    - name: Validar Sintaxe e Estilo (Linter)
+      run: |
+        ruff check .
+
+    - name: Executar Testes Unitários
+      run: |
+        pytest
+        
