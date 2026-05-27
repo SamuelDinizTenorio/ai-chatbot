@@ -1,4 +1,3 @@
-import os
 import importlib
 import app  # Importa o app.py
 

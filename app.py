@@ -2,11 +2,9 @@ import streamlit as st
 from google import genai
 import os
 import time
-from datetime import datetime
 from dotenv import load_dotenv
 import logging
-from logging.handlers import RotatingFileHandler
-from typing import List, Dict, Any
+from typing import List, Dict
 
 # Carrega as variáveis de ambiente necessárias para a execução
 load_dotenv()
