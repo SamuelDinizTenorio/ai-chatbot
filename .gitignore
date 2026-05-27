@@ -5,5 +5,18 @@ __pycache__/
 
 .env
 
+# Arquivos de logs
 logs/
 logs/*.log
+
+# Ferramentas de Teste (PyTest e Ruff)
+.pytest_cache/
+.ruff_cache/
+
+# Configurações locais do VS Code ou outras IDEs
+.vscode/
+.idea/
+
+# Arquivos temporários do sistema operacional
+.DS_Store
+Thumbs.db
