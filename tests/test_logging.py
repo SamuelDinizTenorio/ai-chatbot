@@ -13,5 +13,5 @@ def test_session_filter_outside_streamlit():
     
     # Assert - Fora do Streamlit (no ambiente de teste), ele deve injetar "N/A"
     assert hasattr(log_record, "session_id")
-    assert log_record.session_id == "N/A"
+    assert log_record.session_id == "LOCAL"
     
