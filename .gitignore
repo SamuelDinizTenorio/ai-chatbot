@@ -20,3 +20,16 @@ logs/*.log
 # Arquivos temporários do sistema operacional
 .DS_Store
 Thumbs.db
+
+# 🐍 Pytest e Cobertura de Código
+.pytest_cache/
+.cache/
+.coverage
+htmlcov/
+flake8/
+
+# Arquivos de bytecode do Python (gerados automaticamente ao rodar o código)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

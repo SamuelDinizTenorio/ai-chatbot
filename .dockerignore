@@ -1,6 +1,13 @@
+.git
+.gitignore
+.dockerignore
+.localstack/
 .env
+
+# Evita enviar o cache de testes locais para a imagem do container
+.pytest_cache/
 __pycache__/
 *.pyc
-logs/
-.git/
-.streamlit/
+
+# Evita enviar o script de infraestrutura local para o container do chatbot
+init-aws.sh
