@@ -102,7 +102,10 @@ def prepare_gemini_history(messages: List[Dict[str, str]]) -> List[genai.types.C
 # ==============================================================================
 
 def main():
-    st.write("# ChatBot with AI")
+    # Interface Inicial
+    st.title("🤖 AI Chatbot Assistant")
+    st.caption("Developed with Google Gemini SDK and Streamlit")
+    st.markdown("---")
 
     # Inicialização segura do estado da sessão do chat
     if "messages" not in st.session_state:
