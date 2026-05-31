@@ -3,7 +3,9 @@ venv/
 __pycache__/
 *.pyc
 
+# 🔑 Variáveis de Ambiente e Credenciais
 .env
+!.env.example
 
 # Arquivos de logs
 logs/

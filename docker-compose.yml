@@ -1,0 +1,21 @@
+services:
+  # ============================================================================
+  # Chatbot Python/Streamlit
+  # ============================================================================
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chatbot:latest # Força o Docker a gerar a imagem com esse nome exato
+    container_name: chatbot
+    ports:
+      - "8501:8501"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+    # 📝 CONFIGURAÇÃO DE LOGS LOCAL
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m" # Limita o arquivo de log a 10MB
+        max-file: "3"   # Mantém no máximo 3 arquivos de histórico
