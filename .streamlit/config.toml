@@ -1,8 +1,12 @@
 [theme]
 
-base = "dark"  # Força o comportamento base do modo escuro
-primaryColor = "#7A1CAC" # Cor de destaque (botões, foco de inputs, barras de progresso)
-backgroundColor = "#1E1E2E" # Cor de fundo da área principal do chat
-secondaryBackgroundColor = "#252538" # Cor de fundo dos menus laterais ou caixas de diálogo
-textColor = "#F5F5F5" # Cor do texto principal
-font = "sans serif" # Fonte do texto (sans serif, serif ou monospace)
+# ==============================================================================
+# STREAMLIT USER INTERFACE STYLE & THEME CONFIGURATION
+# ==============================================================================
+
+base = "dark"  # Forces the application to inherit baseline dark mode styling behavior
+primaryColor = "#7A1CAC" # Accent color utilized for interactive elements (e.g., buttons, input focus states, progress indicators)
+backgroundColor = "#1E1E2E" # Background color applied to the main content area/chat interface canvas
+secondaryBackgroundColor = "#252538" # Background color allocated for auxiliary components (such as sidebars, cards, and modal dialogs)
+textColor = "#F5F5F5" # High-contrast typography color applied to all primary body text and labels
+font = "sans serif" # Global application typeface system setting (Supported options: "sans serif", "serif", "monospace")
