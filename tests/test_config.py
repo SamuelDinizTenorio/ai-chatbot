@@ -1,23 +1,37 @@
 import importlib
-import app  # Importa o app.py
+
+# ==============================================================================
+# TEST SUITE: DYNAMIC ENVIRONMENT VARIABLES & FALLBACKS
+# ==============================================================================
 
 def test_model_name_default_fallback(monkeypatch):
-    # Arrange - Garante que a variável do modelo está vazia na memória
+    """Ensures that the application defaults to the standard model
+    when no custom GEMINI_MODEL environment variable is configured.
+    """
+    import app  # Load module context
+    
+    # Arrange - Purge target environment variables from current process memory
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
     
-    # Act - Recarrega o módulo para testar a lógica de inicialização
+    # Act - Reload application module to force initialization cycle
     importlib.reload(app)
     
-    # Assert - Deve assumir o valor padrão definido no código
+    # Assert - Verify application falls back to the specified default model
     assert app.MODEL_NAME == "gemini-2.5-flash"
 
+
 def test_model_name_custom_value(monkeypatch):
-    # Arrange - Simula que o usuário mudou o modelo no arquivo .env para o Pro
+    """Ensures the application dynamically overrides the target model
+    when configured via custom system environment variables.
+    """
+    import app  # Load module context
+    
+    # Arrange - Simulate custom runtime environment configuration
     monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-pro")
     
-    # Act
+    # Act - Reload application to register updated environmental states
     importlib.reload(app)
     
-    # Assert - Deve capturar o modelo do ambiente corretamente
+    # Assert - Verify system correctly binds the configured model parameter
     assert app.MODEL_NAME == "gemini-2.5-pro"
     

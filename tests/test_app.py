@@ -1,18 +1,25 @@
 from app import prepare_gemini_history
 
+# ==============================================================================
+# TEST SUITE: DATA TRANSFORMATION & SCHEMA VALIDATION
+# ==============================================================================
+
 def test_prepare_gemini_history_format():
-    # 1. Arrage - Dados simulados do Streamlit
+    """Validates that raw Streamlit message structures are correctly serialized
+    into Google GenAI Content and Part schemas.
+    """
+    # 1. Arrange - Simulate persistent message logs from the user interface
     mock_messages = [
-        {"role": "user", "content": "Olá, tudo bem?"},
-        {"role": "model", "content": "Olá! Como posso ajudar hoje?"}
+        {"role": "user", "content": "Hello, how are you?"},
+        {"role": "model", "content": "Hello! How can I assist you today?"}
     ]
     
-    # 2. Act - Executa a função do seu app.py
-    resultado = prepare_gemini_history(mock_messages)
+    # 2. Act - Execute the serialization function defined in app.py
+    result = prepare_gemini_history(mock_messages)
     
-    # 3. Assert
-    assert len(resultado) == 2
-    assert resultado[0].role == "user"
-    assert resultado[1].role == "model"
-    assert resultado[0].parts[0].text == "Olá, tudo bem?"
-    assert resultado[1].parts[0].text == "Olá! Como posso ajudar hoje?"
+    # 3. Assert - Verify correct structural hierarchy and turn-taking roles
+    assert len(result) == 2
+    assert result[0].role == "user"
+    assert result[1].role == "model"
+    assert result[0].parts[0].text == "Hello, how are you?"
+    assert result[1].parts[0].text == "Hello! How can I assist you today?"

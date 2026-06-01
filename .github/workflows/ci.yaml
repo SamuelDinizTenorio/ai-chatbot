@@ -1,5 +1,11 @@
-name: CI - Testes Automatizados
+name: CI - Automated Testing Pipeline
 
+# ==============================================================================
+# PIPELINE TRIGGER CONFIGURATION
+# ==============================================================================
+
+# Evaluates and triggers the automated workflow on push or pull requests
+# targeting the 'main' branch to ensure continuous integration standards.
 on:
   push:
     branches:
@@ -10,33 +16,33 @@ on:
 
 jobs:
 # ==============================================================================
-# ESTÁGIO DE TESTES (CI) - Garante a saúde do código
+# QUALITY ASSURANCE & TESTING SUITE
 # ==============================================================================
   test:
-    name: Rodar Testes e Validações
+    name: Run Verification and Test Suite
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Configurar Python
+    - name: Set up Python Environment
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
 
-    - name: Instalar Dependências
+    - name: Install Project Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pytest ruff
         pip install -r requirements.txt
 
-    - name: Validar Sintaxe e Estilo (Linter)
+    - name: Validate Syntax, Style, and Imports (Ruff Linter)
       run: |
         ruff check .
 
-    - name: Executar Testes Unitários
+    - name: Execute Automated Unit & Integration Tests (PyTest)
       run: |
         pytest
         

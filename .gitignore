@@ -1,36 +1,48 @@
+# ==============================================================================
+# VIRTUAL ENVIRONMENTS
+# ==============================================================================
 venv/
 .venv/
 __pycache__/
 *.pyc
 
-# 🔑 Variáveis de Ambiente e Credenciais
+# ==============================================================================
+# ENVIRONMENT VARIABLES & SENSITIVE CREDENTIALS
+# ==============================================================================
 .env
 !.env.example
 
-# Arquivos de logs
+# ==============================================================================
+# TELEMETRY & APPLICATION LOGS
+# ==============================================================================
 logs/
 logs/*.log
 
-# Ferramentas de Teste (PyTest e Ruff)
-.pytest_cache/
-.ruff_cache/
-
-# Configurações locais do VS Code ou outras IDEs
+# ==============================================================================
+# IDE & EDITOR SPECIFIC CONFIGURATIONS
+# ==============================================================================
 .vscode/
 .idea/
 
-# Arquivos temporários do sistema operacional
+# ==============================================================================
+# OPERATING SYSTEM TEMPORARY FILES
+# ==============================================================================
 .DS_Store
 Thumbs.db
 
-# 🐍 Pytest e Cobertura de Código
+# ==============================================================================
+# TESTING, LINTING, AND CODE COVERAGE
+# ==============================================================================
+.ruff_cache/
 .pytest_cache/
 .cache/
 .coverage
 htmlcov/
 flake8/
 
-# Arquivos de bytecode do Python (gerados automaticamente ao rodar o código)
+# ==============================================================================
+# PYTHON BYTECODE & RUNTIME CACHES
+# ==============================================================================
 __pycache__/
 *.pyc
 *.pyo

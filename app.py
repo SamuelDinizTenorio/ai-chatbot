@@ -6,44 +6,43 @@ from dotenv import load_dotenv
 import logging
 from typing import List, Dict
 
-# Carrega as variáveis de ambiente necessárias para a execução
+# Load environment variables required for execution
 load_dotenv()
 
 # ==============================================================================
-# SISTEMA DE LOGS E RASTREAMENTO
+# LOGGING AND TELEMETRY SYSTEM
 # ==============================================================================
 
 class SessionFilter(logging.Filter):
-    """Filtro personalizado para injetar o ID da sessão do Streamlit nos logs.
+    """Custom log filter to inject the Streamlit session ID into log records.
     
-    Isso permite rastrear as interações de um usuário específico de forma isolada,
-    mesmo que múltiplos usuários estejam acessando o chatbot simultaneamente.
+    Enables isolated tracking of specific user interactions, maintaining session 
+    boundary separation even when multiple clients access the chatbot concurrently.
     """
     def filter(self, record: logging.LogRecord) -> bool:
-        # Importação e método oficial para capturar o contexto atual da sessão
+        # Official context retrieval utility from the Streamlit runtime
         from streamlit.runtime.scriptrunner import get_script_run_ctx
         
-        # Recupera o ID de sessão único gerado pelo Streamlit para o usuário atual
+        # Extract the unique Streamlit session identifier associated with the active connection context
         ctx = get_script_run_ctx()
-        # Checagem segura: só acessa .session_id se o ctx realmente existir
-        record.session_id = ctx.session_id if (ctx and hasattr(ctx, 'session_id')) else "LOCAL"
+        # Safe fallback evaluation: populate with the session ID only if context runtime is active
+        record.session_id = ctx.session_id if (ctx and hasattr(ctx, 'session_id')) else "N/A"
         return True
 
 @st.cache_resource
 def setup_logging() -> logging.Logger:
-    """Configuração limpa e de alta performance para CloudWatch/Fargate."""
+    """Configures high-performance logging optimized for containerized environments (e.g., AWS ECS/Fargate)."""
     logger = logging.getLogger("ChatBot")
     logger.setLevel(logging.INFO)
     
     if logger.hasHandlers():
         logger.handlers.clear()
         
-    # Formato padronizado que as ferramentas de busca da AWS (como CloudWatch Insights)
-    # conseguem ler e filtrar facilmente.
+    # Standardized logging format easily parsed by cloud analytics platforms (such as AWS CloudWatch Logs Insights)
     log_format = '%(asctime)s - [%(session_id)s] - %(levelname)s - %(message)s'
     formatter = logging.Formatter(log_format)
     
-    # Envia tudo para o console (stdout). A AWS captura isso automaticamente.
+    # Redirect logs to standard output (stdout) for automated container runtime aggregation
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     
@@ -52,40 +51,40 @@ def setup_logging() -> logging.Logger:
     
     return logger
 
-# Inicializa o logger global
+# Initialize the global application logger
 logger = setup_logging()
 
 # ==============================================================================
-# INICIALIZAÇÃO DE COMPONENTES CORE
+# CORE COMPONENT INITIALIZATION
 # ==============================================================================
 
 try:
-    # O SDK conecta automaticamente usando a variável GEMINI_API_KEY do .env
+    # The SDK automatically establishes authentication via the GEMINI_API_KEY environment variable
     client = genai.Client()
 except Exception as e:
-    logger.critical(f"Falha crítica na inicialização do cliente Gemini: {str(e)}")
-    st.error("Erro interno de configuração. Por favor, contate o administrador.")
+    logger.critical(f"Critical failure during Gemini client initialization: {str(e)}")
+    st.error("Internal configuration error. Please contact the administrator.")
     st.stop()
 
-# Nome do modelo padrão caso não esteja definido no arquivo .env
+# Default model fallback definition if the GEMINI_MODEL environment variable is undefined
 MODEL_NAME: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # ==============================================================================
-# DOCUMENTAÇÃO E TRATAMENTO DE DADOS
+# DATA TRANSFORMATION AND SCHEMAS
 # ==============================================================================
 
 def prepare_gemini_history(messages: List[Dict[str, str]]) -> List[genai.types.Content]:
-    """Converte o histórico de mensagens do Streamlit no formato oficial do Gemini SDK.
+    """Serializes the Streamlit state history into the structured schemas expected by the Gemini SDK.
     
-    A API do Gemini exige uma estrutura estrita baseada em objetos de Content e Parts,
-    além de requerer a alternância correta entre os papéis 'user' e 'model'.
+    The Gemini API strictly requires specialized Content and Part objects,
+    maintaining an alternate turn-taking sequence between the 'user' and 'model' roles.
 
     Args:
-        messages (List[Dict[str, str]]): Lista de dicionários contendo o histórico 
-            no formato [{"role": "...", "content": "..."}].
+        messages (List[Dict[str, str]]): List of raw message dicts formatted as 
+            [{"role": "...", "content": "..."}].
 
     Returns:
-        List[genai.types.Content]: Lista de objetos formatados prontos para a API.
+        List[genai.types.Content]: List of validated Content schema payloads for the API.
     """
     gemini_history: List[genai.types.Content] = []
     for msg in messages:
@@ -98,42 +97,42 @@ def prepare_gemini_history(messages: List[Dict[str, str]]) -> List[genai.types.C
     return gemini_history
 
 # ==============================================================================
-# INTERFACE E FLUXO DA CONVERSA (STREAMLIT)
+# STREAMLIT USER INTERFACE & STATE ENGINE
 # ==============================================================================
 
 def main():
-    # Interface Inicial
+    # Render structural UI components
     st.title("🤖 AI Chatbot Assistant")
     st.caption("Developed with Google Gemini SDK and Streamlit")
     st.markdown("---")
 
-    # Inicialização segura do estado da sessão do chat
+    # Safe initialization of state persistence for user message history
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    # Captura a entrada do usuário na barra de chat
+    # Capture prompt payload from the user input interface
     user_input: str = st.chat_input()
 
-    # Renderização do histórico em tela
+    # Re-render persistent history elements to screen
     for message in st.session_state.messages:
         role_display = "assistant" if message["role"] == "model" else "user"
         st.chat_message(role_display).write(message["content"])
 
-    # Processamento da nova mensagem enviada
+    # Evaluate incoming message payload
     if user_input:
-        # Atualiza a interface e o estado local com a mensagem do usuário
+        # Update UI layout and local session state with the current user prompt
         st.chat_message("user").write(user_input)
         st.session_state.messages.append({"role": "user", "content": user_input})
         
-        logger.info(f"Mensagem recebida. Tamanho do histórico local: {len(st.session_state.messages)} mensagens.")
+        logger.info(f"Incoming message received. Local message history depth: {len(st.session_state.messages)} messages.")
         
         try:
-            logger.info(f"Iniciando requisição à API (Modelo: {MODEL_NAME})")
+            logger.info(f"Initiating remote API request (Target Model: {MODEL_NAME})")
             
-            # Início do cronômetro para medir a latência da resposta
+            # Initiate high-resolution performance timer to measure end-to-end API inference latency
             start_time = time.time()
             
-            # Converte o histórico contendo apenas o passado (exclui a mensagem atual do usuário)
+            # Extract historical runtime state (excluding current un-evaluated message)
             gemini_history = prepare_gemini_history(st.session_state.messages[:-1])
             
             chat = client.chats.create(
@@ -144,27 +143,27 @@ def main():
             response = chat.send_message(user_input)
             ai_response = response.text
             
-            # Fim do cronômetro
+            # Calculate round-trip latency metrics
             latency = time.time() - start_time
             
-            # Extração opcional de metadados de tokens (se suportado pelo objeto de resposta)
+            # Extract system token usage metadata if exposed by the response schema
             token_info = ""
             if hasattr(response, 'usage_metadata') and response.usage_metadata:
                 prompt_tokens = response.usage_metadata.prompt_token_count
                 candidates_tokens = response.usage_metadata.candidates_token_count
                 token_info = f" | Prompt Tokens: {prompt_tokens} | Output Tokens: {candidates_tokens}"
             
-            # Log enriquecido com métricas de performance e custo
-            logger.info(f"Resposta gerada com sucesso | Tempo de Resposta: {latency:.2f}s{token_info}")
+            # Output structured telemetry log mapping response latency, token limits, and consumption cost metrics
+            logger.info(f"Response generated successfully | End-to-End Latency: {latency:.2f}s{token_info}")
             
-            # Atualiza a interface e o estado local com a resposta do modelo
+            # Synchronize client state and UI container with the generated AI model output
             st.chat_message("assistant").write(ai_response)
             st.session_state.messages.append({"role": "model", "content": ai_response})
             
         except Exception as e:
-            # Captura detalhada de falhas, incluindo o rastreio da pilha de execução (Stacktrace)
-            logger.error(f"Falha na comunicação com o provedor de IA: {str(e)}", exc_info=True)
-            st.error("Desculpe, tive um problema ao processar sua requisição. Por favor, tente novamente.")
+            # Capture structural stack trace for execution failures during model evaluation
+            logger.error(f"Communication failure with upstream GenAI service provider: {str(e)}", exc_info=True)
+            st.error("We encountered an error processing your request. Please try again.")
         
 if __name__ == "__main__":
     main()

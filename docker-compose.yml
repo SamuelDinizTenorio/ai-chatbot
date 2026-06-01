@@ -1,21 +1,23 @@
 services:
   # ============================================================================
-  # Chatbot Python/Streamlit
+  # Python / Streamlit Chatbot Service Definition
   # ============================================================================
   chatbot:
     build:
       context: .
       dockerfile: Dockerfile
-    image: chatbot:latest # Força o Docker a gerar a imagem com esse nome exato
+    image: chatbot:latest # Explicitly tags the generated image with this target tag
     container_name: chatbot
     ports:
       - "8501:8501"
+    # Bridges host/environment variables down into the running container environment.
+    # Enables secure consumption of API keys and model parameters without hardcoding.
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL}
-    # 📝 CONFIGURAÇÃO DE LOGS LOCAL
+    # 📝 High-Availability Logging Strategy (Log Rotation & Storage Management)
     logging:
-      driver: "json-file"
+      driver: "json-file" # Specifies the json-file logging driver to collect container standard output
       options:
-        max-size: "10m" # Limita o arquivo de log a 10MB
-        max-file: "3"   # Mantém no máximo 3 arquivos de histórico
+        max-size: "10m" # Prevents disk space exhaustion by capping files at 10MB
+        max-file: "3"   # Retains a maximum of 3 historical rotated log files
