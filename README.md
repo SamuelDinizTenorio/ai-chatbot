@@ -97,3 +97,13 @@ To monitor the message flow, token metrics, and AI response times in real time, 
 ```bash
 docker compose logs -f chatbot
 ```
+
+---
+
+## 📸 Log Output Demo
+
+Below is an example of the structured log output, demonstrating how session IDs, token usage, and latency metrics are formatted in real time:
+
+<p align="center">
+  <img src="assets/log-output-demo.png" alt="Log output demo">
+</p>
